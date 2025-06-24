@@ -717,7 +717,7 @@ class RayPPOTrainer:
                     
                     
                     if replay_buffer.capacity == 0:
-                        replay_buffer.capacity = self.config.worker.actor.replay_size * initial_batch_size
+                        replay_buffer.capacity = int(self.config.worker.actor.replay_size * initial_batch_size)
                     if batch_buffer.capacity == 0:
                         batch_buffer.capacity = 2 * initial_batch_size
                     

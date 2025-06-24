@@ -20,9 +20,8 @@ from omegaconf import OmegaConf
 from ..single_controller.ray import RayWorkerGroup
 from ..utils.tokenizer import get_processor, get_tokenizer
 from ..workers.fsdp_workers import FSDPWorker
-from ..workers.reward import BatchFunctionRewardManager, SequentialFunctionRewardManager
+from ..workers.reward import FunctionRewardManager, TestRewardManager
 from .config import PPOConfig
-from .data_loader import create_dataloader
 from .ray_trainer import RayPPOTrainer, ResourcePoolManager, Role
 
 
@@ -38,13 +37,11 @@ class Runner:
         # instantiate tokenizer
         tokenizer = get_tokenizer(
             config.worker.actor.model.model_path,
-            override_chat_template=config.data.override_chat_template,
             trust_remote_code=config.worker.actor.model.trust_remote_code,
             use_fast=True,
         )
         processor = get_processor(
             config.worker.actor.model.model_path,
-            override_chat_template=config.data.override_chat_template,
             trust_remote_code=config.worker.actor.model.trust_remote_code,
             use_fast=True,
         )
@@ -52,38 +49,28 @@ class Runner:
         # define worker classes
         ray_worker_group_cls = RayWorkerGroup
         role_worker_mapping = {
-            Role.ActorRolloutRef: ray.remote(FSDPWorker),
+            Role.ActorRollout: ray.remote(FSDPWorker),
             Role.Critic: ray.remote(FSDPWorker),
+            Role.RefPolicy: ray.remote(FSDPWorker),
         }
         global_pool_id = "global_pool"
         resource_pool_spec = {
             global_pool_id: [config.trainer.n_gpus_per_node] * config.trainer.nnodes,
         }
         mapping = {
-            Role.ActorRolloutRef: global_pool_id,
+            Role.ActorRollout: global_pool_id,
             Role.Critic: global_pool_id,
+            Role.RefPolicy: global_pool_id,
         }
         resource_pool_manager = ResourcePoolManager(resource_pool_spec=resource_pool_spec, mapping=mapping)
 
-        if config.worker.reward.reward_type == "sequential":
-            RewardManager = SequentialFunctionRewardManager
-        elif config.worker.reward.reward_type == "batch":
-            RewardManager = BatchFunctionRewardManager
-        else:
-            raise NotImplementedError(f"Unknown reward type {config.worker.reward.reward_type}.")
-
-        RemoteRewardManager = ray.remote(RewardManager).options(num_cpus=config.worker.reward.num_cpus)
-        reward_fn = RemoteRewardManager.remote(config.worker.reward, tokenizer)
-        val_reward_fn = RemoteRewardManager.remote(config.worker.reward, tokenizer)
-
-        train_dataloader, val_dataloader = create_dataloader(config.data, tokenizer, processor)
+        reward_fn = FunctionRewardManager(config=config.worker.reward, tokenizer=tokenizer)
+        val_reward_fn = FunctionRewardManager(config=config.worker.reward, tokenizer=tokenizer)
 
         trainer = RayPPOTrainer(
             config=config,
             tokenizer=tokenizer,
             processor=processor,
-            train_dataloader=train_dataloader,
-            val_dataloader=val_dataloader,
             role_worker_mapping=role_worker_mapping,
             resource_pool_manager=resource_pool_manager,
             ray_worker_group_cls=ray_worker_group_cls,
@@ -112,10 +99,7 @@ def main():
             "env_vars": {
                 "TOKENIZERS_PARALLELISM": "true",
                 "NCCL_DEBUG": "WARN",
-                "VLLM_LOGGING_LEVEL": "WARN",
-                "TORCH_NCCL_AVOID_RECORD_STREAMS": "1",
-                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:False",
-                "PYTHONUNBUFFERED": "1",
+                "VLLM_LOGGING_LEVEL": "INFO",
             }
         }
         ray.init(runtime_env=runtime_env)

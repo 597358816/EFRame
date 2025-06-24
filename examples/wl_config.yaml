@@ -10,7 +10,7 @@ data:
   val_batch_size: -1
   shuffle: true
   seed: 1
-  max_pixels: 4194304
+  max_pixels: 602112
   min_pixels: 262144
 
 algorithm:
@@ -24,7 +24,7 @@ worker:
   actor:
     global_batch_size: 128
     micro_batch_size_per_device_for_update: 4
-    micro_batch_size_per_device_for_experience: 8
+    micro_batch_size_per_device_for_experience: 4
     max_grad_norm: 1.0
     padding_free: true
     ulysses_sequence_parallel_size: 1
@@ -73,16 +73,16 @@ worker:
 
 trainer:
   total_episodes: 300
-  logger: ["console","wandb"]
-  project_name: Paper
+  logger: ["console"]
+  project_name: Rollout
   experiment_name: qwen2_5_3b_origin
   n_gpus_per_node: 8
   nnodes: 1
-  val_freq: 5  # -1 to disable
-  val_before_train: true
+  val_freq: 10  # -1 to disable
+  val_before_train: false
   val_only: false
   val_generations_to_log: 3
   save_freq: 5  # -1 to disable
-  save_limit: 1  # -1 to disable
+  save_limit: 20  # -1 to disable
   save_checkpoint_path: null
   load_checkpoint_path: null

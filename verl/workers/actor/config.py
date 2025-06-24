@@ -33,7 +33,7 @@ class ModelConfig:
         if self.tokenizer_path is None:
             self.tokenizer_path = self.model_path
 
-        if self.model_path is not None and os.path.exists(self.model_path):  # ray job uses absolute path
+        if self.model_path is not None and os.path.exists(self.model_path):
             self.model_path = os.path.abspath(self.model_path)
 
         if self.tokenizer_path is not None and os.path.exists(self.tokenizer_path):
@@ -47,10 +47,9 @@ class OptimConfig:
     weight_decay: float = 1e-2
     strategy: str = "adamw"
     lr_warmup_ratio: float = 0.0
-    lr_warmup_steps: Optional[int] = None
     min_lr_ratio: Optional[float] = None
     warmup_style: str = "constant"
-    # below are auto keys
+    """auto keys"""
     training_steps: int = field(default=-1, init=False)
 
 
@@ -58,7 +57,7 @@ class OptimConfig:
 class FSDPConfig:
     enable_full_shard: bool = True
     enable_cpu_offload: bool = False
-    enable_rank0_init: bool = True
+    enable_rank0_init: bool = False
     use_orig_params: bool = False
     torch_dtype: Optional[str] = None
     fsdp_size: int = -1
@@ -77,33 +76,21 @@ class OffloadConfig:
 class ActorConfig:
     strategy: str = "fsdp"
     global_batch_size: int = 256
-    """number of samples per minibatch for updating actor"""
     micro_batch_size_per_device_for_update: int = 4
-    """number of samples per forward pass for updating actor"""
     micro_batch_size_per_device_for_experience: int = 16
-    """number of samples per forward pass for computing log probs"""
     max_grad_norm: float = 1.0
-    """number to clip grad norm"""
     clip_ratio_low: float = 0.2
-    """clip ratio in PPO & DAPO"""
     clip_ratio_high: float = 0.3
-    """clip ratio in PPO & DAPO"""
     clip_ratio_dual: float = 3.0
-    """constant C in dual-clip PPO, clips when advantage < -C"""
-    loss_avg_mode: str = "token"
-    """loss average mode: `token`, `seq`"""
     ppo_epochs: int = 1
-    """number of ppo epochs for each rollout batch"""
-    padding_free: bool = True
-    """use padding-free training"""
-    ulysses_size: int = 1
-    """ulysses sequence parallel size"""
+    padding_free: bool = False
+    ulysses_sequence_parallel_size: int = 1
     use_torch_compile: bool = True
     model: ModelConfig = field(default_factory=ModelConfig)
     optim: OptimConfig = field(default_factory=OptimConfig)
     fsdp: FSDPConfig = field(default_factory=FSDPConfig)
     offload: OffloadConfig = field(default_factory=OffloadConfig)
-    # below are auto keys
+    """auto keys"""
     global_batch_size_per_device: int = field(default=-1, init=False)
     disable_kl: bool = field(default=False, init=False)
     use_kl_loss: bool = field(default=False, init=False)
@@ -116,8 +103,8 @@ class RefConfig:
     strategy: str = "fsdp"
     fsdp: FSDPConfig = field(default_factory=FSDPConfig)
     offload: OffloadConfig = field(default_factory=OffloadConfig)
-    # below are auto keys
+    """auto keys"""
     micro_batch_size_per_device_for_experience: int = field(default=-1, init=False)
     padding_free: bool = field(default=False, init=False)
-    ulysses_size: int = field(default=1, init=False)
+    ulysses_sequence_parallel_size: int = field(default=1, init=False)
     use_torch_compile: bool = field(default=True, init=False)

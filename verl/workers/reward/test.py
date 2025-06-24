@@ -15,7 +15,6 @@
 import importlib.util
 import os
 import sys
-import random
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
@@ -38,7 +37,7 @@ ScoreFunction = Callable[[str, str], RewardScore]
 
 
 @dataclass
-class FunctionRewardManager:
+class TestRewardManager:
     config: RewardConfig
     tokenizer: PreTrainedTokenizer
 
@@ -84,9 +83,6 @@ class FunctionRewardManager:
             ground_truth = data_item.non_tensor_batch["ground_truth"]
 
             score = self.score_fn(response_str, ground_truth)
-            #score["overall"] = float(random.randint(0, 1))
-            #if len(response_str) > 1536:
-            #    score["overall"] -= min(1, (len(response_str) - 1536) / 1024)
             reward_tensor[i, valid_response_length - 1] = score["overall"]
             for key, value in score.items():
                 reward_metrics[key].append(value)

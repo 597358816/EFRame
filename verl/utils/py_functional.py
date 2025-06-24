@@ -15,17 +15,13 @@
 Contain small python utility functions
 """
 
-import importlib.metadata
 import importlib.util
 import re
-from contextlib import contextmanager
 from functools import lru_cache
 from typing import Any, Dict, List, Union
 
 import numpy as np
 import yaml
-from codetiming import Timer
-from packaging import version
 from yaml import Dumper
 
 
@@ -53,18 +49,6 @@ yaml.add_representer(np.float64, float_representer)
 @lru_cache
 def is_package_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
-
-
-def get_package_version(name: str) -> "version.Version":
-    try:
-        return version.parse(importlib.metadata.version(name))
-    except Exception:
-        return version.parse("0.0.0")
-
-
-@lru_cache
-def is_transformers_version_greater_than(content: str):
-    return get_package_version("transformers") >= version.parse(content)
 
 
 def union_two_dict(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
@@ -117,11 +101,3 @@ def flatten_dict(data: Dict[str, Any], parent_key: str = "", sep: str = "/") -> 
 
 def convert_dict_to_str(data: Dict[str, Any]) -> str:
     return yaml.dump(data, indent=2)
-
-
-@contextmanager
-def timer(name: str, timing_raw: Dict[str, float]):
-    with Timer(name=name, logger=None) as timer:
-        yield
-
-    timing_raw[name] = timer.last

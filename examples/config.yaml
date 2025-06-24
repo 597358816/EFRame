@@ -77,9 +77,9 @@ worker:
     score_function: ./score_function/math.py:math_compute_score
 
 trainer:
-  total_episodes: 300
+  total_episodes: 30
   logger: ["console","wandb"]
-  project_name: ReplayEntropy
+  project_name: EFRame
   experiment_name: qwen2_5_3b_origin
   n_gpus_per_node: 8
   nnodes: 1

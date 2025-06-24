@@ -24,6 +24,8 @@ class RolloutConfig:
     name: str = "vllm"
     n: int = 1
     temperature: float = 1.0
+    additional_n: int = 20
+    additional_temperature: float = 1.2
     top_p: float = 1.0
     top_k: int = -1
     seed: int = 1

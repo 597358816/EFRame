@@ -23,7 +23,7 @@ algorithm:
 worker:
   actor:
     global_batch_size: 128
-    micro_batch_size_per_device_for_update: 4
+    micro_batch_size_per_device_for_update: 2
     micro_batch_size_per_device_for_experience: 4
     max_grad_norm: 1.0
     padding_free: true
@@ -72,8 +72,8 @@ worker:
     score_function: ./score_function/math.py:math_compute_score
 
 trainer:
-  total_episodes: 300
-  logger: ["console"]
+  total_episodes: 15
+  logger: ["console","wandb"]
   project_name: Rollout
   experiment_name: qwen2_5_3b_origin
   n_gpus_per_node: 8

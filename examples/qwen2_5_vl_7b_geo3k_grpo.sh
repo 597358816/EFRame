@@ -11,5 +11,5 @@ python3 -m verl.trainer.main \
     data.val_files=hiyouga/geometry3k@test \
     data.format_prompt="${FORMAT_PROMPT}" \
     worker.actor.model.model_path=${MODEL_PATH} \
-    trainer.experiment_name=Ablation:replaybuffer \
+    trainer.experiment_name=test \
     trainer.n_gpus_per_node=8 \

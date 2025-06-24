@@ -61,6 +61,8 @@ class AlgorithmConfig:
     kl_type: str = "fixed"
     kl_horizon: float = 0.0
     kl_target: float = 0.0
+    replay_size: float = 2.0
+    replay_freq: float = 5
 
 
 @dataclass
@@ -105,6 +107,8 @@ class PPOConfig:
         self.worker.actor.use_kl_loss = self.algorithm.use_kl_loss
         self.worker.actor.kl_penalty = self.algorithm.kl_penalty
         self.worker.actor.kl_coef = self.algorithm.kl_coef
+        self.worker.actor.replay_size = self.algorithm.replay_size
+        self.worker.actor.replay_freq = self.algorithm.replay_freq
 
     def deep_post_init(self):
         recursive_post_init(self)

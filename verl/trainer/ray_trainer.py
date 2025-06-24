@@ -176,22 +176,6 @@ def _select_by_advantage(batch: DataProto, threshold = 0, absolute = True):
     else:
         return None
 
-def _select_easy_prompts(batch: DataProto, rollout_n: int, eps: float = 1e-6):
-    advantages = batch.batch["advantages"][:, 0]
-    values = batch.batch["token_level_scores"].sum(dim = 1)
-    selected_mask = (advantages.abs() < eps) & (values > eps)
-    selected_indices = selected_mask.nonzero(as_tuple=False).squeeze(-1)
-    #n1 = len(selected_indices)
-    #selected_indices = [i.item() // rollout_n for i in selected_indices if i.item() % rollout_n == 0]
-    #n2 = len(selected_indices)
-    #print(f"select easy prompts:", len(selected_indices))
-    #assert n1 == n2 * rollout_n
-    return selected_indices
-
-def set_easy_advantages(batch: DataProto, easy_indices: List[int], adv: int):
-    advantages = batch.batch["advantages"]  # shape: [B, T]
-    for idx in easy_indices:
-        advantages[idx] = adv
 
 def _select_hard_prompts(batch: DataProto, rollout_n: int, difficult_record, eps: float = 1e-6):
     advantages = batch.batch["advantages"][:, 0]
@@ -231,24 +215,6 @@ def count_occurrences(batch: DataProto, name):
         print(name, k, v)
     return occurrences_counter
 
-def _align_batch_with_buffer(batch: DataProto, buf: Buffer, s):
-    n1 = len(batch)
-    if buf.size < len(batch) % s:
-        batch = trim_to_multiple(batch, s)
-    else:
-        batch = DataProto.concat([batch, buf.sample((s - len(batch) % s) % s)])
-    n2 = len(batch)
-    print(f"align num of samples from {n1} to {n2}")
-    return batch
-
-def trim_to_multiple(batch: DataProto, s: int):
-    total = len(batch)
-    target_size = (total // s) * s
-    if total == target_size:
-        return batch
-
-    start_idx = total - target_size
-    return batch.select_by_index(list(range(start_idx, total)))
 
 @contextmanager
 def _timer(name: str, timing_raw: Dict[str, float]):
@@ -257,9 +223,6 @@ def _timer(name: str, timing_raw: Dict[str, float]):
 
     timing_raw[name] = timer.last
 
-def print_batch(batch: DataProto, s = ""):
-    for k, v in batch.batch.items():
-        print(s,k,v.size())
 
 def duplicate_gen_batch(batch: DataProto, n: int):
     if len(batch) % n > 0:
@@ -754,7 +717,7 @@ class RayPPOTrainer:
                     
                     
                     if replay_buffer.capacity == 0:
-                        replay_buffer.capacity = 2 * initial_batch_size
+                        replay_buffer.capacity = self.config.worker.actor.replay_size * initial_batch_size
                     if batch_buffer.capacity == 0:
                         batch_buffer.capacity = 2 * initial_batch_size
                     
@@ -767,12 +730,8 @@ class RayPPOTrainer:
 
                     if len(gen_difficult_batch) % 32 > 0:
                         gen_difficult_batch = duplicate_gen_batch(gen_difficult_batch, 32)
-                    rollout_n = 20
-                    temperature = 1.2
-                    #rollout_n = max(4 * self.config.worker.rollout.n - max(self.global_step - 100, 0) // 10, 10)
-                    #temperature = max(1, 1.2 - max(self.global_step - 100, 0) / 500)
-                    gen_difficult_batch.meta_info["temperature"] = temperature
-                    gen_difficult_batch.meta_info["n"] = rollout_n
+                    gen_difficult_batch.meta_info["temperature"] = self.config.worker.rollout.additional_temperature
+                    gen_difficult_batch.meta_info["n"] = self.config.worker.rollout.additional_n
                     
 
                     # generate response for difficult prompts
@@ -782,7 +741,7 @@ class RayPPOTrainer:
 
                     difficult_batch = initial_batch.select_by_index(difficult_prompt_indices)
                     difficult_batch = duplicate_gen_batch(difficult_batch, 32)
-                    difficult_batch = difficult_batch.repeat(repeat_times = rollout_n, interleave=True)
+                    difficult_batch = difficult_batch.repeat(repeat_times = self.config.worker.rollout.additional_n, interleave=True)
                     difficult_batch = difficult_batch.union(gen_difficult_batch_output)
 
                     self._compute_reward(difficult_batch, timing_raw, metrics)
@@ -794,12 +753,11 @@ class RayPPOTrainer:
 
                     # union final batch
                     batch = DataProto.concat([difficult_batch, medium_advantage_batch])
-                    #_filtering_overlong(batch, overlong_record, overlong_positive_record)
                     batch = _filtering_overlong(batch, overlong_record, overlong_positive_record)
 
-                    print("difficult prompt nums:", difficult_record)
-                    print("overlong_nums:", overlong_record)
-                    print("overlong_positive:", overlong_positive_record)
+                    #print("difficult prompt nums:", difficult_record)
+                    #print("overlong_nums:", overlong_record)
+                    #print("overlong_positive:", overlong_positive_record)
                     batch_buffer.add(batch)
                     if batch_buffer.size >= initial_batch_size:
                         batch = batch_buffer.pop((batch_buffer.size // initial_batch_size) * initial_batch_size)
@@ -814,7 +772,7 @@ class RayPPOTrainer:
                         print("replay_buffer size:", replay_buffer.size)
                     
                     # train using replay buffer
-                    if (self.global_step % 5 == 0 and replay_buffer.size // initial_batch_size > 0):
+                    if (self.global_step % self.config.worker.actor.replay_freq == 0 and replay_buffer.size // initial_batch_size > 0):
                         print("start replay buffer")
                         if replay_buffer.size == replay_buffer.capacity:
                             replay_batch = replay_buffer.buffer
@@ -822,18 +780,7 @@ class RayPPOTrainer:
                             replay_batch = replay_buffer.sample((replay_buffer.size // initial_batch_size)* initial_batch_size)
                         self._update_critic(replay_batch, timing_raw, metrics)
                         self._update_actor(replay_batch, timing_raw, metrics)
-                        print("end replay buffer")
-                    '''
-                    _select_hard_prompts(batch, self.config.worker.rollout.n, difficult_record, 0.01)
-                    _filtering_overlong(batch, overlong_record, overlong_positive_record)
-                    print("difficult prompt nums:", difficult_record)
-                    print("overlong_nums:", overlong_record)
-                    print("overlong_positive:", overlong_positive_record)
-                    self._compute_old_log_probs(batch, timing_raw)
-                    self._compute_ref_log_probs(batch, timing_raw)
-                    self._update_critic(batch, timing_raw, metrics)
-                    self._update_actor(batch, timing_raw, metrics)
-                    '''
+                        print("start replay buffer")
 
                     # validate
                     if (

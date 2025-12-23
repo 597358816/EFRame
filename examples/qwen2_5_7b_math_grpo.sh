@@ -11,5 +11,5 @@ python3 -m verl.trainer.main \
     data.val_files=hiyouga/math12k@test \
     data.format_prompt="${FORMAT_PROMPT}" \
     worker.actor.model.model_path=${MODEL_PATH} \
-    trainer.experiment_name=RFR-DAPO \
+    trainer.experiment_name=name \
     trainer.n_gpus_per_node=8

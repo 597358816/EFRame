@@ -749,7 +749,7 @@ class RayPPOTrainer:
                     self._compute_values(difficult_batch, timing_raw)
                     self._compute_adv(difficult_batch, timing_raw)
                     count_occurrences(difficult_batch, "advantages")
-                    difficult_batch = _select_by_advantage(difficult_batch, threshold = 1)
+                    difficult_batch = _select_by_advantage(difficult_batch, threshold = 1, absolute = True)
 
                     # union final batch
                     batch = DataProto.concat([difficult_batch, medium_advantage_batch])
